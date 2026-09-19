@@ -28,7 +28,7 @@ The `skills` CLI is maintained by [vercel-labs/skills](https://github.com/vercel
 
 ### `create-vetta-marketplace`
 
-Creates, migrates, validates, publishes, and connects GitHub based Vetta ability marketplaces. It covers schema v3 plugin artifacts, Skills, Scenes, MCP servers, Bundles, Desktop source configuration, private repositories, compatibility branches, and publication checks. New repositories include a protected CI workflow that builds immutable `.vettapkg` assets and opens Draft catalog PRs without automatically merging them.
+Creates, migrates, validates, publishes, and connects GitHub based Vetta ability marketplaces. It covers schema v3 plugin artifacts, Skills, Scenes, MCP servers, Bundles, Desktop source configuration, private repositories, compatibility branches, and publication checks. New repositories follow the Helm static repository model: reviewed source PRs trigger immutable `.vettapkg` releases and a generated gh-pages index. No generated catalog PR is required.
 
 ## Contributing
 

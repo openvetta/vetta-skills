@@ -19,11 +19,11 @@ abilities/
 .github/workflows/marketplace.yml
 ```
 
-Desktop downloads a complete GitHub branch archive, validates it, and creates a local immutable snapshot keyed by the source and `marketplaceVersion`. Search and filtering happen locally.
+Desktop downloads the generated gh-pages distribution archive (source and build files are excluded), validates it, and creates a local immutable snapshot keyed by the source and `marketplaceVersion`. Search and filtering happen locally.
 
 Paths must be relative, remain inside the repository, and contain no symbolic links. A custom Desktop source must be a GitHub repository and its configured ref must be a branch.
 
-## Manifest
+## Generated manifest
 
 The manifest lives at `.vetta/marketplace.json`:
 
@@ -41,7 +41,7 @@ The manifest lives at `.vetta/marketplace.json`:
 
 - `schemaVersion`: use `3` for versioned plugin artifacts. Versions 1 and 2 are legacy directory installation contracts.
 - `name`: lowercase slug, up to 64 characters.
-- `marketplaceVersion`: immutable version of the whole snapshot. Change it for every content change.
+- `marketplaceVersion`: immutable version of the whole snapshot. CI changes it when distributed content changes. Do not maintain it in the source configuration.
 - `repository`: canonical HTTPS GitHub repository URL.
 - `minAppVersion`: lowest stable Desktop SemVer that understands the snapshot.
 - `abilities[].version`: version of one ability.
@@ -140,3 +140,7 @@ Do not list a Bundle only member at the top level unless it should also appear i
 Use `ability.json` and package local files for icons and detail content. Desktop renders a fixed allowlist of blocks and does not execute marketplace HTML, JavaScript, CSS, or iframes.
 
 Keep the default catalog text in English. Put translations in `detail.i18n`, and category translations in `categoryI18n`. Locale overrides replace array values rather than concatenating them. All referenced files must remain within the ability directory.
+
+## Source declaration
+
+Author `.vetta/marketplace.source.json` with the same listing metadata, but omit `marketplaceVersion` and plugin `releases`. Each plugin source entry, including bundle-only members, declares `minAppVersion`. The builder derives immutable release records and generates `.vetta/marketplace.json` on gh-pages. These are two stages of one model, not two manually synchronized catalogs.

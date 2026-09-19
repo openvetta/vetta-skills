@@ -1,57 +1,31 @@
-# Schema v3 release pipeline
+# Static ability repository
 
-## Why schema v3 separates the catalog from plugin bytes
+Use the Helm chart-releaser publication model: source PR → build unpublished versions → GitHub Release packages → generated index on gh-pages. The tooling adapts this model to Vetta; it does not publish Helm charts.
 
-The catalog and Desktop App evolve independently. A plugin update can require a newer App or Plugin API. Schema v3 records multiple immutable plugin releases and lets Desktop select the highest compatible version before presenting an install or update.
+## Author and release
 
-Keep source and presentation files in Git. Put built `.vettapkg` files in immutable Release storage. This keeps generated output out of source history and gives every installed package a URL and digest that can be audited or rolled back.
+1. Maintain `.vetta/marketplace.source.json` and the ability directories on `main`.
+2. Increase the ability version when runtime changes are ready to release. Plugin source entries also declare `minAppVersion`.
+3. Submit and review a normal source PR. Protect `main` with required reviews and the `marketplace-source` check.
+4. Merge. CI builds unpublished plugin versions, checks stable Desktop compatibility, uploads `.vettapkg` assets, verifies their bytes, and publishes the generated distribution.
+5. Add the repository to Desktop with branch `gh-pages` after the first successful run.
 
-## Publish one plugin release
+No release-plan file, generated catalog PR, or manually bumped marketplace version is used. `main` contains source; Releases contain plugin packages; `gh-pages` contains `.vetta/marketplace.json`, presentation resources and installable non-plugin content. GitHub Pages hosting is optional because Desktop reads the distribution branch directly.
 
-1. Update and test the plugin source.
-2. Set a new stable `plugin.json#version` and the actual `pluginApiVersion`, permissions, and commands.
-3. Commit the source and version changes to the marketplace branch, or to a repository branch containing its latest commit.
-4. Run **Publish plugin release candidate**, selecting that source branch. The workflow installs dependencies, runs available checks and tests, and builds the `.vettapkg` in CI.
-5. CI creates or verifies the unique `plugin-<slug>-<version>` Release and computes SHA-256 over the exact uploaded bytes. Enable immutable releases when the hosting policy supports them.
-6. CI adds the new immutable `releases[]` record, advances `marketplaceVersion`, and opens a Draft PR. It does not write to or merge the protected branch.
-7. Review the Draft PR and run:
+## Validation and recovery
 
-   ```bash
-   npx --yes @vetta-org/plugin-cli@^0.1.6 sync --check
-   ```
+Use Node.js 22.21.1+ and Python 3. Run `node scripts/marketplace.mjs check`, `node --test tests/*.test.mjs`, and `node scripts/marketplace.mjs build` locally. The build command uses a fresh output directory and does not upload. Use `--previous <checked-out-gh-pages-directory>` for incremental publication. On Windows with a Python shim, set `VETTA_PYTHON` to the real interpreter executable.
 
-8. Run the publication gate from an `open-vetta` checkout:
+The workflow reconciles the generated distribution and runs the Desktop publication validator using the Plugin CLI source and validator from the fixed revision in `.vetta/publish.json`. Keep this revision pinned; update it through source review.
 
-    ```bash
-    node scripts/release/check-plugin-marketplace-publication.mjs \
-      /path/to/marketplace/.vetta/marketplace.json
-    ```
+The build job has read-only permissions and no write token. The publication job has `contents: write`, uploads the already built bytes, and never merges or pushes source changes to main. It does not run ability build scripts.
 
-The gate fails closed when a declared minimum Desktop version is not a completed stable OpenVetta GitHub Release, the released host does not support schema v3 or the declared Plugin API, an artifact is unavailable or too large, or its SHA-256 differs.
+Repeated runs verify existing asset bytes; conflicting bytes require a new ability version. The index changes only after verification succeeds. A newer source/distribution revision makes an old run fail rather than overwrite current state. Rerun the latest revision. Previously published versions remain available for compatible Desktop builds.
 
-Schema v3 is being prepared for Desktop 0.5.59. Until that stable Desktop release exists, use the local candidate test for end to end validation; the publication gate should continue to reject promotion that claims 0.5.59 compatibility.
+Stable publication requires the declared Desktop versions to have completed stable releases. Local fixtures can validate a development Desktop, but cannot waive the stable publication gate.
 
-The scaffolded GitHub Actions workflows build the package, open the Draft PR, run index reconciliation, and execute this publication gate. Mark the PR ready and merge it only after the required reviewers approve it and every gate passes.
+## Existing repositories
 
-In repository Actions settings, grant workflows read and write access and allow GitHub Actions to
-create Pull Requests. Protect the marketplace branch with required reviews and required marketplace
-checks. The generated workflows still declare only the individual permissions they use.
+Do not run the scaffold over an existing marketplace. Preserve existing stable refs used by old clients. Import a verified existing schema v3 distribution into `gh-pages` if its release history is valid; never seed unavailable or changed artifacts. Otherwise create a new distribution from source and verify its first publication before switching clients. Historical `.zip` packages remain readable.
 
-## Compatibility branches
-
-Desktop versions that only understand schema v1/v2 install plugins directly from `source.path` and therefore require committed built runtime files. They reject schema v3 and keep an older cached snapshot when available.
-
-When old clients still need support:
-
-- keep the legacy schema v2 catalog and built plugin directories on its existing stable branch
-- create a separate schema v3 branch or repository for current Desktop
-- configure each Desktop release line to use the matching branch
-- do not advance the old branch to schema v3 until that client line is retired
-
-A branch switch changes the source identity and cache. A catalog update within one branch must still use a new `marketplaceVersion`.
-
-## Promotion and rollback
-
-Build candidate packages once in CI. The generated Draft PR references those exact uploaded bytes; review and validate it before advancing the stable catalog branch. Do not rebuild during promotion.
-
-To roll back, restore references to previously verified artifacts and publish a new, higher `marketplaceVersion`. Never replace an old Release asset or reuse an old marketplace version with different content.
+Changing source refs affects source identity and caches. Do not silently rewrite user-added sources. A rollback must publish a fresh index revision; never overwrite an existing release asset or reuse a snapshot version with different bytes.
