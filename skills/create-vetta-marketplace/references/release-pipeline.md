@@ -10,19 +10,17 @@ Keep source and presentation files in Git. Put built `.vettapkg` files in immuta
 
 1. Update and test the plugin source.
 2. Set a new stable `plugin.json#version` and the actual `pluginApiVersion`, permissions, and commands.
-3. Build with `@vetta-org/plugin-vite`. New builds should produce `release/<slug>-<version>.vettapkg`.
-4. Inspect the package and compute SHA-256 over its exact bytes.
-5. Create a unique release tag, for example `plugin-<slug>-<version>`.
-6. Upload the `.vettapkg` without rebuilding, recompressing, or renaming it after hashing. Enable immutable releases when the hosting policy supports them.
-7. Add a new `releases[]` record with the stable URL and digest. Do not edit older records.
-8. Set the ability's top level `version` to the highest release and advance `marketplaceVersion`.
-9. Run:
+3. Push the source and version changes to a repository branch based on the latest protected marketplace branch.
+4. Run **Publish plugin release candidate**, selecting that source branch. The workflow installs dependencies, runs available checks and tests, and builds the `.vettapkg` in CI.
+5. CI creates or verifies the unique `plugin-<slug>-<version>` Release and computes SHA-256 over the exact uploaded bytes. Enable immutable releases when the hosting policy supports them.
+6. CI adds the new immutable `releases[]` record, advances `marketplaceVersion`, and opens a Draft PR. It does not write to or merge the protected branch.
+7. Review the Draft PR and run:
 
    ```bash
    npx --yes @vetta-org/plugin-cli@^0.1.6 sync --check
    ```
 
-10. Run the publication gate from an `open-vetta` checkout:
+8. Run the publication gate from an `open-vetta` checkout:
 
     ```bash
     node scripts/release/check-plugin-marketplace-publication.mjs \
@@ -33,7 +31,11 @@ The gate fails closed when a declared minimum Desktop version is not a completed
 
 Schema v3 is being prepared for Desktop 0.5.59. Until that stable Desktop release exists, use the local candidate test for end to end validation; the publication gate should continue to reject promotion that claims 0.5.59 compatibility.
 
-The scaffolded GitHub Actions workflow runs both index reconciliation and this publication gate.
+The scaffolded GitHub Actions workflows build the package, open the Draft PR, run index reconciliation, and execute this publication gate. Mark the PR ready and merge it only after the required reviewers approve it and every gate passes.
+
+In repository Actions settings, grant workflows read and write access and allow GitHub Actions to
+create Pull Requests. Protect the marketplace branch with required reviews and required marketplace
+checks. The generated workflows still declare only the individual permissions they use.
 
 ## Compatibility branches
 
@@ -50,6 +52,6 @@ A branch switch changes the source identity and cache. A catalog update within o
 
 ## Promotion and rollback
 
-Build candidate packages once. Validate those exact bytes locally, upload them, pass CI, then advance the stable catalog branch. Do not rebuild during promotion.
+Build candidate packages once in CI. The generated Draft PR references those exact uploaded bytes; review and validate it before advancing the stable catalog branch. Do not rebuild during promotion.
 
 To roll back, restore references to previously verified artifacts and publish a new, higher `marketplaceVersion`. Never replace an old Release asset or reuse an old marketplace version with different content.

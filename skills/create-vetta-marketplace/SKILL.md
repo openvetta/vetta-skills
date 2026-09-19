@@ -32,7 +32,8 @@ Read [references/marketplace-contract.md](references/marketplace-contract.md) be
 - Keep `slug`, type, and version identical across the catalog and the package identity file.
 - Use `SKILL.md` with `name`, `description`, and `version` frontmatter for both Skill and Scene packages.
 - Put MCP runtime configuration in `mcp.json`; do not put MCP configuration in the catalog entry.
-- Publish plugin runtime bytes as immutable `.vettapkg` release assets. Keep source and presentation files in Git as desired, but do not commit `dist/`, `release/`, or generated plugin archives to a schema v3 catalog.
+- Publish plugin runtime bytes with the generated **Publish plugin release candidate** workflow. It builds an immutable `.vettapkg`, uploads it, records its digest, and opens a Draft catalog PR. It never writes to or merges the protected marketplace branch directly.
+- Keep source and presentation files in Git as desired, but do not commit `dist/`, `release/`, or generated plugin archives to a schema v3 catalog.
 - Record the exact plugin permissions, commands, Plugin API range, minimum Desktop version, artifact URL, and lowercase SHA-256 for every plugin release.
 - Increment `marketplaceVersion` whenever any catalog or ability content changes. Never reuse a published marketplace version for different bytes.
 
@@ -49,7 +50,7 @@ npx --yes @vetta-org/plugin-cli@^0.1.6 sync --check
 
 Review every reported change. `sync` may update versions and ordinary numeric or semantic marketplace versions; it deliberately does not invent listing metadata or publish abilities.
 
-For schema v3 plugins, follow [references/release-pipeline.md](references/release-pipeline.md). Upload the exact package bytes first, then add their immutable URL and digest to `releases[]`. Run the generated GitHub Actions workflow before advancing the stable marketplace branch.
+For schema v3 plugins, follow [references/release-pipeline.md](references/release-pipeline.md). Push the source and version change to a repository branch, then run the generated release workflow. Review its Draft PR and required checks before advancing the stable marketplace branch.
 
 Creating repositories, uploading Release assets, changing branch protection, and publishing a stable catalog are remote mutations. Perform them when the user's request already authorizes them; otherwise prepare the repository and ask for authorization at the final remote step.
 

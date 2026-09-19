@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 import { spawnSync } from "node:child_process";
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { cpSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 
 const args = process.argv.slice(2);
@@ -25,6 +25,17 @@ function appendIgnored(path, entry) {
   writeFileSync(path, `${lines.join("\n")}\n`, "utf8");
 }
 
+function shanghaiDate(now = new Date()) {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Shanghai",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(now);
+  const value = Object.fromEntries(parts.map((part) => [part.type, part.value]));
+  return `${value.year}.${value.month}.${value.day}`;
+}
+
 function agentsGuide(name) {
   return `# ${name}
 
@@ -37,7 +48,8 @@ This repository is a Vetta schema v3 ability marketplace. Abilities live below \
 - Run \`npx --yes @vetta-org/plugin-cli@^0.1.6 sync\` after changing an ability, then review its output.
 - Run \`npx --yes @vetta-org/plugin-cli@^0.1.6 sync --check\` before every push.
 - Advance \`marketplaceVersion\` for every content change. Never reuse a published version for different bytes.
-- Publish plugin runtime bytes as immutable \`.vettapkg\` Release assets. Record the exact URL and SHA-256 in \`releases[]\`.
+- Publish plugin runtime bytes through the **Publish plugin release candidate** GitHub Actions workflow. It builds an immutable \`.vettapkg\`, records the exact URL and SHA-256, and opens a Draft PR.
+- Never push a generated catalog update directly to \`main\` and never enable automatic merge for release PRs. Review the Draft PR and its marketplace checks before merging.
 - Do not commit plugin \`dist/\`, \`release/\`, or generated packages. Schema v3 installs plugins from Release assets.
 - Do not edit or replace an existing plugin release record; publish a new plugin version.
 - Keep MCP configuration in \`mcp.json\`, never in the catalog entry.
@@ -53,7 +65,9 @@ npm install
 npx vetta-plugin-cli docs --check-latest
 \`\`\`
 
-Build and test from the plugin directory. Keep source if this repository owns it, but upload the generated \`.vettapkg\` outside Git and leave only presentation files required by \`source.path\`.
+Build and test from the plugin directory. Push the source and version changes to a repository branch,
+then run **Publish plugin release candidate** with that branch. CI publishes the exact \`.vettapkg\` and
+creates the catalog PR; local packages are only for preflight checks.
 `;
 }
 
@@ -70,6 +84,12 @@ Branch: main
 \`\`\`
 
 The catalog is \`.vetta/marketplace.json\`. Run \`npx --yes @vetta-org/plugin-cli@^0.1.6 sync --check\` before publishing changes.
+
+Plugin releases are built by **Publish plugin release candidate**. The workflow uploads an immutable
+\`.vettapkg\` and opens a Draft PR; it never pushes to or merges \`main\` directly.
+
+Before the first release, allow GitHub Actions to create Pull Requests, give workflows read and write
+access, and protect \`main\` with required reviews and marketplace checks.
 `;
 }
 
@@ -79,6 +99,13 @@ on:
   pull_request:
   push:
     branches: [main]
+  workflow_dispatch:
+    inputs:
+      base_ref:
+        description: Base branch for a generated release-candidate PR
+        required: true
+        default: main
+        type: string
 
 permissions:
   contents: read
@@ -94,6 +121,32 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
+
+      - name: Verify the dispatched base
+        if: inputs.base_ref != ''
+        env:
+          BASE_REF: \${{ inputs.base_ref }}
+        shell: bash
+        run: |
+          git check-ref-format --branch "$BASE_REF" >/dev/null
+          git fetch origin "refs/heads/$BASE_REF:refs/remotes/origin/$BASE_REF"
+          git merge-base --is-ancestor "origin/$BASE_REF" HEAD
+
+      - name: Build schema v3 plugin packages from source
+        shell: bash
+        run: |
+          node -e "const m=require('./.vetta/marketplace.json'); const a=m.abilities.flatMap(x=>x.type==='plugin'?[x]:x.type==='bundle'?x.config.members.filter(y=>y.type==='plugin'&&y.source):[]); console.log([...new Set(a.map(x=>x.source.path))].join('\\n'))" > /tmp/marketplace-plugin-paths
+          while IFS= read -r path; do
+            [[ -z "$path" ]] || (cd "$path" && npm ci && npm run build)
+          done < /tmp/marketplace-plugin-paths
+
+      - name: Recreate schema v3 plugin packages
+        shell: bash
+        run: |
+          node -e "const m=require('./.vetta/marketplace.json'); const a=m.abilities.flatMap(x=>x.type==='plugin'?[x]:x.type==='bundle'?x.config.members.filter(y=>y.type==='plugin'&&y.source):[]); for(const x of a) console.log(x.slug, x.releases.at(-1).minAppVersion)" > /tmp/marketplace-plugin-releases
+          while read -r slug app_version; do
+            [[ -z "$slug" ]] || python3 scripts/stage-plugin-release.py "$slug" --min-app-version "$app_version"
+          done < /tmp/marketplace-plugin-releases
 
       - name: Reconcile catalog and ability packages
         run: npx --yes @vetta-org/plugin-cli@^0.1.6 sync --check
@@ -161,18 +214,23 @@ try {
   const manifestPath = join(target, ".vetta", "marketplace.json");
   const manifest = JSON.parse(readFileSync(manifestPath, "utf8"));
   manifest.schemaVersion = 3;
+  manifest.marketplaceVersion = `${shanghaiDate()}-1`;
   writeFileSync(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`, "utf8");
 
   mkdirSync(join(target, "abilities", "bundles"), { recursive: true });
   writeFileSync(join(target, "abilities", "bundles", ".gitkeep"), "", "utf8");
   appendIgnored(join(target, ".gitignore"), ".release-artifacts/");
   appendIgnored(join(target, ".gitignore"), ".tooling/");
+  appendIgnored(join(target, ".gitignore"), "abilities/plugins/*/dist/");
+  appendIgnored(join(target, ".gitignore"), "abilities/plugins/*/release/");
   writeFileSync(join(target, "AGENTS.md"), agentsGuide(name), "utf8");
   writeFileSync(join(target, "README.md"), readme(name, repository), "utf8");
   writeFileSync(join(target, ".github", "workflows", "marketplace.yml"), workflow, "utf8");
+  cpSync(new URL("../assets/scripts", import.meta.url), join(target, "scripts"), { recursive: true });
+  cpSync(new URL("../assets/.github/workflows/publish-plugin.yml", import.meta.url), join(target, ".github", "workflows", "publish-plugin.yml"));
 
   process.stdout.write(`Created schema v3 Vetta marketplace ${name} at ${target}\n`);
-  process.stdout.write("Next: add abilities, publish immutable plugin packages, then run sync --check.\n");
+  process.stdout.write("Next: add abilities, push a source branch, then let CI publish a Draft release PR.\n");
 } catch (error) {
   process.stderr.write(`${error instanceof Error ? error.message : String(error)}\n`);
   process.exitCode = 1;
