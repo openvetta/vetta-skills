@@ -65,8 +65,9 @@ npm install
 npx vetta-plugin-cli docs --check-latest
 \`\`\`
 
-Build and test from the plugin directory. Push the source and version changes to a repository branch,
-then run **Publish plugin release candidate** with that branch. CI publishes the exact \`.vettapkg\` and
+Build and test from the plugin directory. Commit the source and version changes to the marketplace
+branch, or to a branch containing its latest commit, then run **Publish plugin release candidate**
+with that branch. CI publishes the exact \`.vettapkg\` and
 creates the catalog PR; local packages are only for preflight checks.
 `;
 }
@@ -230,7 +231,7 @@ try {
   cpSync(new URL("../assets/.github/workflows/publish-plugin.yml", import.meta.url), join(target, ".github", "workflows", "publish-plugin.yml"));
 
   process.stdout.write(`Created schema v3 Vetta marketplace ${name} at ${target}\n`);
-  process.stdout.write("Next: add abilities, push a source branch, then let CI publish a Draft release PR.\n");
+  process.stdout.write("Next: add abilities, commit their source, then let CI publish a Draft release PR.\n");
 } catch (error) {
   process.stderr.write(`${error instanceof Error ? error.message : String(error)}\n`);
   process.exitCode = 1;

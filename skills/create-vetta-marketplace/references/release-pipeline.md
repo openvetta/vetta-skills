@@ -10,7 +10,7 @@ Keep source and presentation files in Git. Put built `.vettapkg` files in immuta
 
 1. Update and test the plugin source.
 2. Set a new stable `plugin.json#version` and the actual `pluginApiVersion`, permissions, and commands.
-3. Push the source and version changes to a repository branch based on the latest protected marketplace branch.
+3. Commit the source and version changes to the marketplace branch, or to a repository branch containing its latest commit.
 4. Run **Publish plugin release candidate**, selecting that source branch. The workflow installs dependencies, runs available checks and tests, and builds the `.vettapkg` in CI.
 5. CI creates or verifies the unique `plugin-<slug>-<version>` Release and computes SHA-256 over the exact uploaded bytes. Enable immutable releases when the hosting policy supports them.
 6. CI adds the new immutable `releases[]` record, advances `marketplaceVersion`, and opens a Draft PR. It does not write to or merge the protected branch.

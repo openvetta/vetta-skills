@@ -50,7 +50,7 @@ npx --yes @vetta-org/plugin-cli@^0.1.6 sync --check
 
 Review every reported change. `sync` may update versions and ordinary numeric or semantic marketplace versions; it deliberately does not invent listing metadata or publish abilities.
 
-For schema v3 plugins, follow [references/release-pipeline.md](references/release-pipeline.md). Push the source and version change to a repository branch, then run the generated release workflow. Review its Draft PR and required checks before advancing the stable marketplace branch.
+For schema v3 plugins, follow [references/release-pipeline.md](references/release-pipeline.md). Commit the source and version change to the marketplace branch, or to a branch containing its latest commit, then run the generated release workflow. Review its Draft PR and required checks before advancing the stable marketplace branch.
 
 Creating repositories, uploading Release assets, changing branch protection, and publishing a stable catalog are remote mutations. Perform them when the user's request already authorizes them; otherwise prepare the repository and ask for authorization at the final remote step.
 
