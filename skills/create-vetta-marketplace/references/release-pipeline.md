@@ -10,7 +10,7 @@ Use the Helm chart-releaser publication model: source PR → build unpublished v
 4. Merge. CI builds unpublished plugin versions, checks stable Desktop compatibility, uploads `.vettapkg` assets, verifies their bytes, and publishes the generated distribution.
 5. Add the repository to Desktop with branch `gh-pages` after the first successful run.
 
-No release-plan file, generated catalog PR, or manually bumped marketplace version is used. `main` contains source; Releases contain plugin packages; `gh-pages` contains `.vetta/marketplace.json`, presentation resources and installable non-plugin content. GitHub Pages hosting is optional because Desktop reads the distribution branch directly.
+No release-plan file, generated catalog PR, or manually bumped marketplace version is used. `.vetta/publish.json#sourceBranch` names the reviewed source branch (`main` for a new marketplace); Releases contain plugin packages; `gh-pages` contains `.vetta/marketplace.json`, presentation resources and installable non-plugin content. GitHub Pages hosting is optional because Desktop reads the distribution branch directly.
 
 ## Validation and recovery
 
@@ -26,6 +26,6 @@ Stable publication requires the declared Desktop versions to have completed stab
 
 ## Existing repositories
 
-Do not run the scaffold over an existing marketplace. Preserve existing stable refs used by old clients. Import a verified existing schema v3 distribution into `gh-pages` if its release history is valid; never seed unavailable or changed artifacts. Otherwise create a new distribution from source and verify its first publication before switching clients. Historical `.zip` packages remain readable.
+Do not run the scaffold over an existing marketplace. Preserve existing stable refs used by old clients. If old clients read `main`, use a protected branch such as `marketplace-source` for new source and set both `.vetta/publish.json#sourceBranch` and the workflow trigger to it; keep `main` unchanged. Import a verified existing schema v3 distribution into `gh-pages` if its release history is valid; never seed unavailable or changed artifacts. Otherwise create a new distribution from source and verify its first publication before switching clients. Historical `.zip` packages remain readable.
 
 Changing source refs affects source identity and caches. Do not silently rewrite user-added sources. A rollback must publish a fresh index revision; never overwrite an existing release asset or reuse a snapshot version with different bytes.
