@@ -1,0 +1,4 @@
+interface:
+  display_name: "Create Vetta Marketplace"
+  short_description: "Create and publish a Vetta ability marketplace"
+  default_prompt: "Use $create-vetta-marketplace to create and connect a Vetta ability marketplace."
